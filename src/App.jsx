@@ -2,13 +2,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import {
   LayoutDashboard, Calculator, ShoppingBag, FileSpreadsheet,
-  Plus, CheckCircle2, Sparkles, Scissors, Wallet, TrendingUp, Globe
+  Plus, CheckCircle2, Sparkles, Scissors, Wallet, TrendingUp, Globe, AlertTriangle
 } from 'lucide-react';
 
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
+const supabaseKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+const supabase =
+  supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 const rp = (num) =>
   new Intl.NumberFormat('id-ID', {
@@ -25,22 +25,38 @@ export default function App() {
   const [orders, setOrders] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState('');
 
   const fetchAll = async () => {
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    const [setRes, pkgRes, prodRes, ordRes, expRes] = await Promise.all([
-      supabase.from('app_settings').select('*').single(),
-      supabase.from('packaging_items').select('*').order('id'),
-      supabase.from('products').select('*').order('kode_produk'),
-      supabase.from('orders').select('*').order('tanggal_pemesanan', { ascending: false }),
-      supabase.from('expenses').select('*').order('tanggal', { ascending: false }),
-    ]);
-    if (setRes.data) setSettings(setRes.data);
-    if (pkgRes.data) setPackaging(pkgRes.data);
-    if (prodRes.data) setProducts(prodRes.data);
-    if (ordRes.data) setOrders(ordRes.data);
-    if (expRes.data) setExpenses(expRes.data);
-    setLoading(false);
+    setErrorMsg('');
+    try {
+      const [setRes, pkgRes, prodRes, ordRes, expRes] = await Promise.all([
+        supabase.from('app_settings').select('*').single(),
+        supabase.from('packaging_items').select('*').order('id'),
+        supabase.from('products').select('*').order('kode_produk'),
+        supabase.from('orders').select('*').order('tanggal_pemesanan', { ascending: false }),
+        supabase.from('expenses').select('*').order('tanggal', { ascending: false }),
+      ]);
+
+      if (setRes.data) setSettings(setRes.data);
+      if (pkgRes.data) setPackaging(pkgRes.data);
+      if (prodRes.data) setProducts(prodRes.data);
+      if (ordRes.data) setOrders(ordRes.data);
+      if (expRes.data) setExpenses(expRes.data);
+
+      const firstErr =
+        pkgRes.error || prodRes.error || ordRes.error || expRes.error;
+      if (firstErr) setErrorMsg(firstErr.message);
+    } catch (err) {
+      setErrorMsg(err.message || 'Gagal terhubung ke Supabase');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -73,6 +89,28 @@ export default function App() {
     return { omzet, uangMasuk, gajiDiri, danaBrand, totalHpp, totalPengeluaran };
   }, [orders, expenses, settings]);
 
+  if (!supabase) {
+    return (
+      <div className="min-h-screen bg-rose-50 flex items-center justify-center p-5">
+        <div className="bg-white p-5 rounded-2xl border border-rose-200 max-w-md w-full space-y-2 text-xs">
+          <div className="flex items-center gap-2 text-rose-600 font-bold text-sm">
+            <AlertTriangle className="w-5 h-5" /> Kunci Database Vercel Belum Terbaca
+          </div>
+          <p className="text-stone-600">
+            Status Environment Variables di Vercel saat ini:
+          </p>
+          <ul className="bg-stone-50 p-3 rounded-xl space-y-1 font-mono text-[11px]">
+            <li>VITE_SUPABASE_URL: {supabaseUrl ? '✅ Terisi' : '❌ Masih Kosong'}</li>
+            <li>VITE_SUPABASE_ANON_KEY: {supabaseKey ? '✅ Terisi' : '❌ Masih Kosong'}</li>
+          </ul>
+          <p className="text-stone-500">
+            Isi variabel yang masih silang merah di Vercel Settings → Environment Variables, lalu klik Redeploy.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-rose-50/50 flex flex-col items-center justify-center text-rose-800">
@@ -97,6 +135,12 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {errorMsg && (
+        <div className="m-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+          <b>Info Database:</b> {errorMsg}
+        </div>
+      )}
 
       <main className="p-4">
         {activeTab === 'dashboard' && (
@@ -132,8 +176,7 @@ export default function App() {
               const newBrand = 100 - newGaji;
               await supabase
                 .from('app_settings')
-                .update({ gaji_diri_persen: newGaji, brand_persen: newBrand })
-                .eq('id', 1);
+                .upsert({ id: 1, gaji_diri_persen: newGaji, brand_persen: newBrand });
               fetchAll();
             }}
           />
