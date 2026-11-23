@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
-const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || '').trim().replace(/\/$/, '');
+const SUPABASE_URL = (
+  import.meta.env.VITE_SUPABASE_URL?.includes('supabase.co')
+    ? import.meta.env.VITE_SUPABASE_URL
+    : 'https://orjqrywkjtwjofnmfsnx.supabase.co'
+).trim().replace(/\/$/, '');
 const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
 const hasConfig = Boolean(SUPABASE_URL && SUPABASE_KEY);
 
