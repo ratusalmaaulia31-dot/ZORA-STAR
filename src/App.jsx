@@ -1,10 +1,27 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
-const supabaseKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
-const supabase =
-  supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || '').trim().replace(/\/$/, '');
+const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+const hasConfig = Boolean(SUPABASE_URL && SUPABASE_KEY);
+
+async function sbFetch(path, options = {}) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+      ...(options.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(errText || `HTTP ${res.status}`);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
 
 const rp = (num) =>
   new Intl.NumberFormat('id-ID', {
@@ -24,32 +41,28 @@ export default function App() {
   const [errorMsg, setErrorMsg] = useState('');
 
   const fetchAll = async () => {
-    if (!supabase) {
+    if (!hasConfig) {
       setLoading(false);
       return;
     }
     setLoading(true);
     setErrorMsg('');
     try {
-      const [setRes, pkgRes, prodRes, ordRes, expRes] = await Promise.all([
-        supabase.from('app_settings').select('*').maybeSingle(),
-        supabase.from('packaging_items').select('*').order('id'),
-        supabase.from('products').select('*').order('kode_produk'),
-        supabase.from('orders').select('*').order('tanggal_pemesanan', { ascending: false }),
-        supabase.from('expenses').select('*').order('tanggal', { ascending: false }),
+      const [setData, pkgData, prodData, ordData, expData] = await Promise.all([
+        sbFetch('app_settings?select=*&limit=1'),
+        sbFetch('packaging_items?select=*&order=id.asc'),
+        sbFetch('products?select=*&order=kode_produk.asc'),
+        sbFetch('orders?select=*&order=tanggal_pemesanan.desc'),
+        sbFetch('expenses?select=*&order=tanggal.desc'),
       ]);
 
-      if (setRes.data) setSettings(setRes.data);
-      if (pkgRes.data) setPackaging(pkgRes.data);
-      if (prodRes.data) setProducts(prodRes.data);
-      if (ordRes.data) setOrders(ordRes.data);
-      if (expRes.data) setExpenses(expRes.data);
-
-      const firstErr =
-        pkgRes.error || prodRes.error || ordRes.error || expRes.error;
-      if (firstErr) setErrorMsg(firstErr.message);
+      if (setData && setData[0]) setSettings(setData[0]);
+      if (pkgData) setPackaging(pkgData);
+      if (prodData) setProducts(prodData);
+      if (ordData) setOrders(ordData);
+      if (expData) setExpenses(expData);
     } catch (err) {
-      setErrorMsg(err.message || 'Gagal terhubung ke Supabase');
+      setErrorMsg(err.message || 'Gagal mengambil data dari Supabase');
     } finally {
       setLoading(false);
     }
@@ -85,16 +98,16 @@ export default function App() {
     return { omzet, uangMasuk, gajiDiri, danaBrand, totalHpp, totalPengeluaran };
   }, [orders, expenses, settings]);
 
-  if (!supabase) {
+  if (!hasConfig) {
     return (
       <div className="min-h-screen bg-rose-50 flex items-center justify-center p-5">
         <div className="bg-white p-5 rounded-2xl border border-rose-200 max-w-md w-full space-y-2 text-xs">
           <div className="font-bold text-sm text-rose-600">
-            ⚠️ Kunci Database Vercel Belum Terbaca
+            ⚠️ Kunci Database Vercel Belum Terisi
           </div>
           <ul className="bg-stone-50 p-3 rounded-xl space-y-1 font-mono text-[11px]">
-            <li>VITE_SUPABASE_URL: {supabaseUrl ? '✅ Terisi' : '❌ Masih Kosong'}</li>
-            <li>VITE_SUPABASE_ANON_KEY: {supabaseKey ? '✅ Terisi' : '❌ Masih Kosong'}</li>
+            <li>VITE_SUPABASE_URL: {SUPABASE_URL ? '✅ Terisi' : '❌ Masih Kosong'}</li>
+            <li>VITE_SUPABASE_ANON_KEY: {SUPABASE_KEY ? '✅ Terisi' : '❌ Masih Kosong'}</li>
           </ul>
           <p className="text-stone-500">
             Isi variabel di Vercel Settings → Environment Variables, lalu Redeploy.
@@ -165,9 +178,10 @@ export default function App() {
             settings={settings}
             onUpdateSettings={async (newGaji) => {
               const newBrand = 100 - newGaji;
-              await supabase
-                .from('app_settings')
-                .upsert({ id: 1, gaji_diri_persen: newGaji, brand_persen: newBrand });
+              await sbFetch('app_settings?id=eq.1', {
+                method: 'PATCH',
+                body: JSON.stringify({ gaji_diri_persen: newGaji, brand_persen: newBrand }),
+              });
               fetchAll();
             }}
           />
@@ -207,21 +221,24 @@ function DashboardTab({ orders, summary, settings, onRefresh }) {
   const belumLunas = orders.filter((o) => o.status_pelunasan === 'DP');
 
   const updateStatusKerja = async (id, nextStatus) => {
-    await supabase.from('orders').update({ status_pengerjaan: nextStatus }).eq('id', id);
+    await sbFetch(`orders?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status_pengerjaan: nextStatus }),
+    });
     onRefresh();
   };
 
   const lunasiOrder = async (order) => {
     const tagihanTotal =
       Number(order.harga_satuan) * Number(order.jumlah) - Number(order.potongan || 0);
-    await supabase
-      .from('orders')
-      .update({
+    await sbFetch(`orders?id=eq.${order.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
         status_pelunasan: 'Lunas',
         uang_masuk: tagihanTotal,
         tanggal_pelunasan: new Date().toISOString().slice(0, 10),
-      })
-      .eq('id', order.id);
+      }),
+    });
     onRefresh();
   };
 
@@ -400,21 +417,24 @@ function HppTab({ products, packaging, settings, onRefresh }) {
   const handleSaveProduct = async (e) => {
     e.preventDefault();
     const kode = generateNextCode(kategori);
-    await supabase.from('products').insert([
-      {
-        kode_produk: kode,
-        kategori,
-        nama_produk: namaProduk,
-        nama_benang: namaBenang,
-        biaya_kemasan: totalKemasan,
-        biaya_benang: Number(biayaBenang || 0),
-        biaya_hardware: Number(biayaHardware || 0),
-        biaya_aksesoris: Number(biayaAksesoris || 0),
-        biaya_ring: Number(biayaRing || 0),
-        biaya_lain: Number(biayaLain || 0),
-        harga_jual: Number(hargaJual || 0),
-      },
-    ]);
+    await sbFetch('products', {
+      method: 'POST',
+      body: JSON.stringify([
+        {
+          kode_produk: kode,
+          kategori,
+          nama_produk: namaProduk,
+          nama_benang: namaBenang,
+          biaya_kemasan: totalKemasan,
+          biaya_benang: Number(biayaBenang || 0),
+          biaya_hardware: Number(biayaHardware || 0),
+          biaya_aksesoris: Number(biayaAksesoris || 0),
+          biaya_ring: Number(biayaRing || 0),
+          biaya_lain: Number(biayaLain || 0),
+          harga_jual: Number(hargaJual || 0),
+        },
+      ]),
+    });
     setShowForm(false);
     setNamaProduk('');
     setNamaBenang('');
@@ -721,28 +741,31 @@ function TransaksiTab({ orders, expenses, products, onRefresh }) {
 
   const handleSaveOrder = async (e) => {
     e.preventDefault();
-    await supabase.from('orders').insert([
-      {
-        nama_pembeli: namaPembeli,
-        asal_negara: asalNegara,
-        no_wa: noWa,
-        alamat,
-        kode_produk: isCustom ? 'CUSTOM' : selectedCode,
-        nama_produk: namaProduk,
-        is_custom: isCustom,
-        hpp_satuan: Number(hppSatuan || 0),
-        harga_satuan: Number(hargaSatuan || 0),
-        jumlah: Number(jumlah || 1),
-        warna,
-        note_custom: noteCustom,
-        payment_method: paymentMethod,
-        potongan: Number(potongan || 0),
-        ongkos_jasa_bantu: Number(ongkosBantu || 0),
-        uang_masuk: Number(uangMasuk || 0),
-        status_pelunasan: statusPelunasan,
-        status_pengerjaan: 'Belum Dikerjakan',
-      },
-    ]);
+    await sbFetch('orders', {
+      method: 'POST',
+      body: JSON.stringify([
+        {
+          nama_pembeli: namaPembeli,
+          asal_negara: asalNegara,
+          no_wa: noWa,
+          alamat,
+          kode_produk: isCustom ? 'CUSTOM' : selectedCode,
+          nama_produk: namaProduk,
+          is_custom: isCustom,
+          hpp_satuan: Number(hppSatuan || 0),
+          harga_satuan: Number(hargaSatuan || 0),
+          jumlah: Number(jumlah || 1),
+          warna,
+          note_custom: noteCustom,
+          payment_method: paymentMethod,
+          potongan: Number(potongan || 0),
+          ongkos_jasa_bantu: Number(ongkosBantu || 0),
+          uang_masuk: Number(uangMasuk || 0),
+          status_pelunasan: statusPelunasan,
+          status_pengerjaan: 'Belum Dikerjakan',
+        },
+      ]),
+    });
     setShowOrderForm(false);
     setNamaPembeli('');
     setWarna('');
@@ -754,15 +777,18 @@ function TransaksiTab({ orders, expenses, products, onRefresh }) {
 
   const handleSaveExpense = async (e) => {
     e.preventDefault();
-    await supabase.from('expenses').insert([
-      {
-        tipe: expTipe,
-        nama_item: expNama,
-        detail_warna_kode: expWarna,
-        jumlah_satuan: Number(expQty || 1),
-        nominal: Number(expNominal || 0),
-      },
-    ]);
+    await sbFetch('expenses', {
+      method: 'POST',
+      body: JSON.stringify([
+        {
+          tipe: expTipe,
+          nama_item: expNama,
+          detail_warna_kode: expWarna,
+          jumlah_satuan: Number(expQty || 1),
+          nominal: Number(expNominal || 0),
+        },
+      ]),
+    });
     setExpNama('');
     setExpWarna('');
     setExpQty(1);
