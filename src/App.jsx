@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
-const SUPABASE_URL = (
-  import.meta.env.VITE_SUPABASE_URL?.includes('supabase.co')
-    ? import.meta.env.VITE_SUPABASE_URL
-    : 'https://orjqrywkjtwjofnmfsnx.supabase.co'
-).trim().replace(/\/$/, '');
-const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
-const hasConfig = Boolean(SUPABASE_URL && SUPABASE_KEY);
+const SUPABASE_URL = 'https://orjqrywkjtwjofnmfsnx.supabase.co';
+const SUPABASE_KEY = (
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  'sb_publishable_maejq-J_HzNxggCMtx0g1Q_Bj5Aj'
+).trim();
 
 async function sbFetch(path, options = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -45,10 +43,6 @@ export default function App() {
   const [errorMsg, setErrorMsg] = useState('');
 
   const fetchAll = async () => {
-    if (!hasConfig) {
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     setErrorMsg('');
     try {
@@ -101,25 +95,6 @@ export default function App() {
     const totalPengeluaran = expenses.reduce((acc, e) => acc + Number(e.nominal || 0), 0);
     return { omzet, uangMasuk, gajiDiri, danaBrand, totalHpp, totalPengeluaran };
   }, [orders, expenses, settings]);
-
-  if (!hasConfig) {
-    return (
-      <div className="min-h-screen bg-rose-50 flex items-center justify-center p-5">
-        <div className="bg-white p-5 rounded-2xl border border-rose-200 max-w-md w-full space-y-2 text-xs">
-          <div className="font-bold text-sm text-rose-600">
-            ⚠️ Kunci Database Vercel Belum Terisi
-          </div>
-          <ul className="bg-stone-50 p-3 rounded-xl space-y-1 font-mono text-[11px]">
-            <li>VITE_SUPABASE_URL: {SUPABASE_URL ? '✅ Terisi' : '❌ Masih Kosong'}</li>
-            <li>VITE_SUPABASE_ANON_KEY: {SUPABASE_KEY ? '✅ Terisi' : '❌ Masih Kosong'}</li>
-          </ul>
-          <p className="text-stone-500">
-            Isi variabel di Vercel Settings → Environment Variables, lalu Redeploy.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   if (loading) {
     return (
