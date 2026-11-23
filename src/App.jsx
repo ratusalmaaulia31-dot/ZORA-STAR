@@ -1,9 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import {
-  LayoutDashboard, Calculator, ShoppingBag, FileSpreadsheet,
-  Plus, CheckCircle2, Sparkles, Scissors, Wallet, TrendingUp, Globe, AlertTriangle
-} from 'lucide-react';
 
 const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
 const supabaseKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
@@ -36,7 +32,7 @@ export default function App() {
     setErrorMsg('');
     try {
       const [setRes, pkgRes, prodRes, ordRes, expRes] = await Promise.all([
-        supabase.from('app_settings').select('*').single(),
+        supabase.from('app_settings').select('*').maybeSingle(),
         supabase.from('packaging_items').select('*').order('id'),
         supabase.from('products').select('*').order('kode_produk'),
         supabase.from('orders').select('*').order('tanggal_pemesanan', { ascending: false }),
@@ -93,18 +89,15 @@ export default function App() {
     return (
       <div className="min-h-screen bg-rose-50 flex items-center justify-center p-5">
         <div className="bg-white p-5 rounded-2xl border border-rose-200 max-w-md w-full space-y-2 text-xs">
-          <div className="flex items-center gap-2 text-rose-600 font-bold text-sm">
-            <AlertTriangle className="w-5 h-5" /> Kunci Database Vercel Belum Terbaca
+          <div className="font-bold text-sm text-rose-600">
+            ⚠️ Kunci Database Vercel Belum Terbaca
           </div>
-          <p className="text-stone-600">
-            Status Environment Variables di Vercel saat ini:
-          </p>
           <ul className="bg-stone-50 p-3 rounded-xl space-y-1 font-mono text-[11px]">
             <li>VITE_SUPABASE_URL: {supabaseUrl ? '✅ Terisi' : '❌ Masih Kosong'}</li>
             <li>VITE_SUPABASE_ANON_KEY: {supabaseKey ? '✅ Terisi' : '❌ Masih Kosong'}</li>
           </ul>
           <p className="text-stone-500">
-            Isi variabel yang masih silang merah di Vercel Settings → Environment Variables, lalu klik Redeploy.
+            Isi variabel di Vercel Settings → Environment Variables, lalu Redeploy.
           </p>
         </div>
       </div>
@@ -114,7 +107,7 @@ export default function App() {
   if (loading) {
     return (
       <div className="min-h-screen bg-rose-50/50 flex flex-col items-center justify-center text-rose-800">
-        <Sparkles className="w-8 h-8 animate-spin mb-2 text-rose-500" />
+        <p className="text-2xl mb-2">🧶</p>
         <p className="font-medium text-sm">Memuat Data ZORA STAR...</p>
       </div>
     );
@@ -125,12 +118,10 @@ export default function App() {
       <header className="bg-gradient-to-r from-rose-500 to-pink-500 text-white px-5 py-4 sticky top-0 z-20 shadow-sm">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="font-bold text-lg tracking-wide flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4" /> ZORA STAR
-            </h1>
+            <h1 className="font-bold text-lg tracking-wide">✨ ZORA STAR</h1>
             <p className="text-xs text-rose-100">Crochet Studio & HPP Manager</p>
           </div>
-          <div className="text-right text-xs bg-white/15 px-3 py-1.5 rounded-full backdrop-blur-sm">
+          <div className="text-right text-xs bg-white/15 px-3 py-1.5 rounded-full">
             Split {settings.gaji_diri_persen}% : {settings.brand_persen}%
           </div>
         </div>
@@ -185,12 +176,11 @@ export default function App() {
 
       <nav className="fixed bottom-0 left-0 right-0 max-w-2xl mx-auto bg-white border-t border-stone-200 flex justify-around py-2 px-1 z-30">
         {[
-          { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-          { id: 'hpp', label: 'Katalog HPP', icon: Calculator },
-          { id: 'transaksi', label: 'Transaksi', icon: ShoppingBag },
-          { id: 'laporan', label: 'Laba Rugi', icon: FileSpreadsheet },
+          { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+          { id: 'hpp', label: 'Katalog HPP', icon: '🧮' },
+          { id: 'transaksi', label: 'Transaksi', icon: '🛍️' },
+          { id: 'laporan', label: 'Laba Rugi', icon: '📑' },
         ].map((tab) => {
-          const Icon = tab.icon;
           const active = activeTab === tab.id;
           return (
             <button
@@ -202,7 +192,7 @@ export default function App() {
                   : 'text-stone-400 hover:text-stone-600'
               }`}
             >
-              <Icon className="w-5 h-5 mb-0.5" />
+              <span className="text-base mb-0.5">{tab.icon}</span>
               <span className="text-[11px]">{tab.label}</span>
             </button>
           );
@@ -262,8 +252,8 @@ function DashboardTab({ orders, summary, settings, onRefresh }) {
 
       <section>
         <div className="flex justify-between items-center mb-2.5">
-          <h2 className="font-bold text-sm text-stone-700 flex items-center gap-1.5">
-            <Scissors className="w-4 h-4 text-rose-500" /> Antrian Rajutan ({antrian.length})
+          <h2 className="font-bold text-sm text-stone-700">
+            🧶 Antrian Rajutan ({antrian.length})
           </h2>
         </div>
         {antrian.length === 0 ? (
@@ -326,9 +316,9 @@ function DashboardTab({ orders, summary, settings, onRefresh }) {
                   )}
                   <button
                     onClick={() => updateStatusKerja(o.id, 'Selesai')}
-                    className="flex-1 bg-emerald-600 text-white text-xs font-semibold py-2 rounded-xl flex items-center justify-center gap-1"
+                    className="flex-1 bg-emerald-600 text-white text-xs font-semibold py-2 rounded-xl"
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Tandai Selesai
+                    ✅ Tandai Selesai
                   </button>
                 </div>
               </div>
@@ -338,8 +328,8 @@ function DashboardTab({ orders, summary, settings, onRefresh }) {
       </section>
 
       <section>
-        <h2 className="font-bold text-sm text-stone-700 mb-2.5 flex items-center gap-1.5">
-          <Wallet className="w-4 h-4 text-amber-500" /> Menunggu Pelunasan ({belumLunas.length})
+        <h2 className="font-bold text-sm text-stone-700 mb-2.5">
+          💳 Menunggu Pelunasan ({belumLunas.length})
         </h2>
         <div className="space-y-2">
           {belumLunas.map((o) => {
@@ -458,9 +448,9 @@ function HppTab({ products, packaging, settings, onRefresh }) {
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="bg-rose-500 text-white text-xs font-semibold px-3.5 py-2 rounded-xl flex items-center gap-1 shadow-sm"
+          className="bg-rose-500 text-white text-xs font-semibold px-3.5 py-2 rounded-xl shadow-sm"
         >
-          <Plus className="w-4 h-4" /> Produk Baru
+          + Produk Baru
         </button>
       </div>
 
@@ -805,9 +795,9 @@ function TransaksiTab({ orders, expenses, products, onRefresh }) {
         <>
           <button
             onClick={() => setShowOrderForm(!showOrderForm)}
-            className="w-full bg-rose-500 text-white text-xs font-bold py-3 rounded-xl flex items-center justify-center gap-1.5 shadow-sm"
+            className="w-full bg-rose-500 text-white text-xs font-bold py-3 rounded-xl shadow-sm"
           >
-            <Plus className="w-4 h-4" /> Catat Orderan Baru
+            + Catat Orderan Baru
           </button>
 
           {showOrderForm && (
@@ -1029,8 +1019,8 @@ function TransaksiTab({ orders, expenses, products, onRefresh }) {
                       <span className="font-bold text-sm text-stone-800">
                         {o.nama_pembeli}
                       </span>
-                      <span className="text-[10px] bg-stone-100 px-1.5 py-0.5 rounded text-stone-500 flex items-center gap-0.5">
-                        <Globe className="w-2.5 h-2.5" /> {o.asal_negara}
+                      <span className="text-[10px] bg-stone-100 px-1.5 py-0.5 rounded text-stone-500">
+                        🌍 {o.asal_negara}
                       </span>
                     </div>
                     <p className="text-stone-600 font-medium mt-0.5">
@@ -1288,7 +1278,7 @@ function LaporanTab({ orders, expenses, settings, onUpdateSettings }) {
             <p className="text-[11px] text-stone-400">NETT PROFIT BERSIH</p>
             <p className="text-lg font-bold text-emerald-400">{rp(nettProfit)}</p>
           </div>
-          <TrendingUp className="w-6 h-6 text-emerald-400" />
+          <span className="text-2xl">📈</span>
         </div>
       </div>
     </div>
